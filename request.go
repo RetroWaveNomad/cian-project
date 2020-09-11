@@ -1,35 +1,53 @@
 package main
 
 import (
+	//Import standard libraries
+	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"regexp"
+
+	//Import third party library
+	"github.com/PuerkitoBio/goquery"
 )
 
-func main() {
-	// Make HTTP request
-	response, err := http.Get("https://www.cian.ru/rent/flat/235640722/")
-	if err != nil {
+func Scrape() {
 
-		log.Fatal(err)
-	}
-	defer response.Body.Close()
+	var N int
 
-	// Read response data in to memory
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		log.Fatal("Error reading HTTP body. ", err)
+	flag.IntVar(&N, "N", 0, "Number of requests")
+	flag.Parse()
+
+	for i := 1; i <= N; i++ {
+		// Make HTTP request
+		res, err := http.Get("https://spb.cian.ru/rent/flat/240283825/")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer res.Body.Close()
+
+		doc, err := goquery.NewDocumentFromReader(res.Body)
+		if err != nil {
+			log.Fatal("Error loading HTTP response body.", err)
+		}
+
+		var metaDescription string
+		//Read titile page
+		doc.Find("meta").Each(func(index int, item *goquery.Selection) {
+			if item.AttrOr("name", "") == "description" {
+				metaDescription = item.AttrOr("content", "")
+			}
+		})
+		//Use regular expression to find apartaments for rent
+		re := regexp.MustCompile("Цена аренды")
+		words := re.FindAllString(string(metaDescription), -1)
+		if words == nil {
+			fmt.Println("")
+		} else {
+			fmt.Println(metaDescription)
+		}
+
 	}
 
-	// Create a regular expression to find appartments for rent
-	re := regexp.MustCompile("₽/мес.")
-	words := re.FindAllString(string(body), -1)
-	if words == nil {
-		fmt.Println("No matches.")
-	} else {
-		//Just an example, not done yet
-		fmt.Println(" адрес: Москва, улица Пушкина, дом 10; формат: двушка; цена: пять десят тысяч рублей в месяц")
-	}
 }
